@@ -7,7 +7,7 @@ import SearchFood from './pages/SearchFood';
 import MyListing from './pages/MyListing'; // Import the MyListing component
 import Dashboard from './pages/Dashboard';
 import Auth from './firebase/Auth'; // This is your auth.jsx component
-
+import OrganizationForm from './pages/Receiver-Register';
 // Layout that includes the Navbar
 function MainLayout() {
   return (
@@ -40,6 +40,8 @@ function App() {
         {/* Auth route as the landing page */}
         <Route element={<AuthLayout />}>
           <Route path="/" element={<Auth />} />
+          <Route path="/receiver-register" element={<OrganizationForm />} />
+          
         </Route>
         {/* Routes that need the Navbar */}
         <Route element={<MainLayout />}>
