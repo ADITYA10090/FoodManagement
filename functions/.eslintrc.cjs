@@ -5,8 +5,8 @@ module.exports = {
     node: true,
   },
   parserOptions: {
-    ecmaVersion: 2018,
-    sourceType: "script", // Use "script" for CommonJS
+    ecmaVersion: 2018, // or consider updating to 2020+ if needed
+    sourceType: "module", // Changed to "module" for ES Modules
   },
   extends: [
     "eslint:recommended",

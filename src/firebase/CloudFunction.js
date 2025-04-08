@@ -24,7 +24,7 @@ admin.initializeApp({
 });
 
 // Set your SendGrid API key (best practice: store this as an environment variable)
-sgMail.setApiKey("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");
+sgMail.setApiKey(import.meta.env.TWILIO_API);
 
 //
 // Endpoint to send donation details to organizations

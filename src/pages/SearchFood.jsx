@@ -1,7 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { FaSearch, FaFilter } from 'react-icons/fa';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  deleteDoc,
+  doc 
+} from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { toast } from 'react-hot-toast';
 
 function SearchFood() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,9 +23,7 @@ function SearchFood() {
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   
-  // State to control the modal with contact details
-  const [selectedDonation, setSelectedDonation] = useState(null);
-
+  // Function to handle search
   const handleSearch = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -36,8 +42,8 @@ function SearchFood() {
       const querySnapshot = await getDocs(q);
       const results = [];
       
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
+      querySnapshot.forEach((docSnapshot) => {
+        const data = docSnapshot.data();
         // Filter by search term if provided
         if (
           !searchTerm || 
@@ -45,7 +51,7 @@ function SearchFood() {
           data.description.toLowerCase().includes(searchTerm.toLowerCase())
         ) {
           results.push({
-            id: doc.id,
+            id: docSnapshot.id,
             ...data
           });
         }
@@ -67,15 +73,55 @@ function SearchFood() {
     }));
   };
 
-  // When a user clicks the "Request This Food" button,
-  // set the selected donation so the modal can display contact details.
-  const handleRequest = (donation) => {
-    setSelectedDonation(donation);
-  };
+  // Function to "lock" the food donation by deleting it and sending an acceptance email
+  const handleLockFood = async (donation) => {
+    if (!window.confirm("Are you sure you want to lock this food donation? This action cannot be undone.")) {
+      return;
+    }
 
-  // Close the modal by clearing the selected donation.
-  const closeModal = () => {
-    setSelectedDonation(null);
+    try {
+      // Delete the donation entry from Firestore
+      await deleteDoc(doc(db, 'donations', donation.id));
+      toast.success("Food donation locked successfully!");
+
+      // Send an acceptance email to the donor via your cloud function endpoint
+      await fetch("http://localhost:3000/sendAcceptanceEmail", {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: donation.email, // donor's email from the donation entry
+          donationDetails: {
+            foodType: donation.foodType,
+            quantity: donation.quantity,
+            expiryDate: donation.expiryDate,
+            pickupAddress: donation.pickupAddress,
+            pickupTime: donation.pickupTime,
+            description: donation.description,
+            organization: donation.organization
+          }
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error("Error sending acceptance email");
+        }
+        return response.text();
+      })
+      .then(data => {
+        console.log("Acceptance email sent:", data);
+      })
+      .catch(err => {
+        console.error("Error calling acceptance email endpoint:", err);
+      });
+
+      // Remove the locked donation from the local search results list
+      setSearchResults(prev => prev.filter(item => item.id !== donation.id));
+    } catch (error) {
+      console.error("Error locking food donation:", error);
+      toast.error("Failed to lock food donation");
+    }
   };
 
   return (
@@ -194,39 +240,15 @@ function SearchFood() {
                 </div>
               </div>
               <button
-                onClick={() => handleRequest(result)}
+                onClick={() => handleLockFood(result)}
                 className="mt-4 w-full bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition"
               >
-                Request This Food
+                Lock Food
               </button>
             </div>
           ))
         )}
       </div>
-
-      {/* Modal to display contact details */}
-      {selectedDonation && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
-            <h3 className="text-xl font-bold mb-4">Contact Details</h3>
-            <p className="text-gray-700 mb-2">
-              <strong>Phone:</strong> {selectedDonation.phone || 'N/A'}
-            </p>
-            <p className="text-gray-700 mb-2">
-              <strong>Email:</strong> {selectedDonation.email || 'N/A'}
-            </p>
-            <p className="text-gray-700 mb-4">
-              <strong>UPI ID:</strong> {selectedDonation.upiId || 'N/A'}
-            </p>
-            <button
-              onClick={closeModal}
-              className="w-full bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+// donatefood.js
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { collection, addDoc } from 'firebase/firestore';
@@ -33,15 +34,42 @@ function DonateFood() {
     const userId = currentUser.uid;
 
     try {
+      // Add the donation to Firestore
       const donationsRef = collection(db, 'donations');
-      await addDoc(donationsRef, {
+      const donationDoc = await addDoc(donationsRef, {
         ...formData,
         userId, // uniquely identify who uploaded the donation
         createdAt: new Date().toISOString(),
         status: 'available'
       });
-      
+
       toast.success('Food donation listed successfully!');
+
+      // Automatically send the donation data to the local cloud function endpoint
+      await fetch("http://localhost:3000/sendDonationEmail", {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          donationId: donationDoc.id,
+          ...formData
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error("Error sending donation email");
+        }
+        return response.text();
+      })
+      .then(data => {
+        console.log("Cloud function response:", data);
+      })
+      .catch(err => {
+        console.error("Error calling cloud function:", err);
+      });
+
+      // Reset the form after successful submission
       setFormData({
         foodType: '',
         quantity: '',
@@ -162,7 +190,7 @@ function DonateFood() {
           ></textarea>
         </div>
 
-        {/* New Contact Fields */}
+        {/* Contact Fields */}
         <div>
           <label className="block text-gray-700 mb-2">Phone Number</label>
           <input
